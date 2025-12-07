@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>نظام معمل الروبوت — تسجيل الدخول</title>
+
+<!-- خط IBM Plex Sans Arabic -->
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+
+/* ========== إعدادات عامة ========== */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'IBM Plex Sans Arabic', sans-serif;
+}
+
+body {
+    background: #0f0f14;
+    color: #fff;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* خلفية متحركة */
+.bg-grad {
+    position: absolute;
+    width: 120%;
+    height: 120%;
+    background: radial-gradient(circle at 20% 20%, #5c1bb1, #0f0f14 60%);
+    filter: blur(120px);
+    animation: float 10s infinite alternate ease-in-out;
+    z-index: -1;
+}
+
+@keyframes float {
+    0% { transform: translate(-10px, -10px); }
+    100% { transform: translate(10px, 10px); }
+}
+
+/* ========== صندوق تسجيل الدخول ========== */
+
+.center-box {
+    width: 360px;
+    margin: auto;
+    margin-top: 80px;
+    background: rgba(255,255,255,0.03);
+    padding: 35px;
+    border-radius: 20px;
+    border: 1px solid rgba(128,0,255,0.3);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 0 25px rgba(128,0,255,0.2);
+    animation: boxFade 0.7s ease;
+}
+
+@keyframes boxFade {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+h2 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #c9a4ff;
+    text-shadow: 0 0 12px #7e3af2;
+}
+
+.input {
+    width: 100%;
+    padding: 13px;
+    background: #181820;
+    border: 1px solid #3d3d55;
+    border-radius: 12px;
+    margin-top: 12px;
+    color: #fff;
+    transition: .2s;
+}
+
+.input:focus {
+    border-color: #8a2be2;
+    box-shadow: 0 0 8px #8a2be2;
+}
+
+button {
+    width: 100%;
+    padding: 12px;
+    border-radius: 12px;
+    margin-top: 15px;
+    background: linear-gradient(90deg, #8a2be2, #5b12a4);
+    color: white;
+    font-weight: bold;
+    border: none;
+    cursor: pointer;
+    transition: .2s;
+}
+
+button:hover {
+    opacity: 0.85;
+}
+
+/* زر ثانوي */
+.sec-btn {
+    margin-top: 10px;
+    background: transparent;
+    border: 1px solid #8a2be2;
+}
+
+#msg {
+    text-align: center;
+    margin-top: 10px;
+    min-height: 20px;
+}
+
+/* Popup */
+.popup {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: #1f1f29;
+    padding: 15px 20px;
+    border-radius: 12px;
+    border: 1px solid #8a2be2;
+    box-shadow: 0 0 20px rgba(138,43,226,0.4);
+    opacity: 0;
+    transform: translateY(20px);
+    transition: .4s;
+}
+
+/* يظهر */
+.popup.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* أصوات */
+audio { display: none; }
+
+</style>
+</head>
+<body>
+
+<div class="bg-grad"></div>
+
+<!-- ===== تسجيل الدخول ===== -->
+<div class="center-box" id="loginBox">
+    <h2>تسجيل الدخول مدارس الملك عبدالعزيز الموزجية معمل الروبوت</h2>
+
+    <input id="loginId" class="input" placeholder="رقم الهوية">
+    <input id="loginPass" class="input" type="password" placeholder="كلمة المرور">
+
+    <button onclick="login()">دخول</button>
+
+    <p id="msg"></p>
+
+    <button class="sec-btn" onclick="showRegister()">إنشاء حساب</button>
+</div>
+
+<!-- ===== إنشاء حساب ===== -->
+<div class="center-box" id="registerBox" style="display:none;">
+    <h2>إنشاء حساب</h2>
+
+    <input id="regId" class="input" placeholder="رقم الهوية">
+    <input id="regPass" class="input" type="password" placeholder="كلمة المرور">
+
+    <select id="regRole" class="input">
+        <option value="member">عضو</option>
+        <option value="team">مسؤول فريق</option>
+        <option value="coach">مدرب</option>
+    </select>
+
+    <button onclick="registerUser()">تسجيل</button>
+
+    <button class="sec-btn" onclick="hideRegister()">رجوع</button>
+
+    <p id="regMsg"></p>
+</div>
+
+<!-- ===== Popup ===== -->
+<div id="popup" class="popup"></div>
+
+<!-- ===== الأصوات ===== -->
+<audio id="soundClick" src="https://assets.mixkit.co/sfx/preview/mixkit-select-click-1109.mp3"></audio>
+<audio id="soundSuccess" src="https://assets.mixkit.co/sfx/preview/mixkit-message-pop-alert-2354.mp3"></audio>
+
+<script>
+
+/* ============================
+   قاعدة بيانات المستخدمين
+============================ */
+
+let users = JSON.parse(localStorage.getItem("users")) || [];
+
+/* إنشاء حساب جديد */
+function registerUser() {
+    playClick();
+
+    let id = regId.value.trim();
+    let pass = regPass.value.trim();
+    let role = regRole.value;
+
+    if (!id || !pass)
+        return showPop("❌ أكمل البيانات");
+
+    if (users.find(u => u.id === id))
+        return showPop("⚠ المستخدم موجود مسبقاً");
+
+    let approved = (role === "member") ? true : false;
+
+    users.push({ id, pass, role, approved });
+
+    localStorage.setItem("users", JSON.stringify(users));
+
+    showPop("✔ تم إنشاء الحساب");
+
+    regId.value = "";
+    regPass.value = "";
+}
+
+/* تسجيل الدخول */
+function login() {
+    playClick();
+
+    let id = loginId.value.trim();
+    let pass = loginPass.value.trim();
+
+    let user = users.find(u => u.id === id && u.pass === pass);
+
+    if (!user) return showPop("❌ بيانات غير صحيحة");
+
+    if (!user.approved) return showPop("⏳ بانتظار موافقة المسؤول");
+
+    localStorage.setItem("currentUser", JSON.stringify(user));
+
+    showPop("✔ تم تسجيل الدخول");
+
+    setTimeout(() => {
+        window.location.href = "app.html"; // ← المرحلة القادمة
+    }, 800);
+}
+
+/* ========== وظائف الواجهة ========== */
+
+function showRegister() {
+    loginBox.style.display = "none";
+    registerBox.style.display = "block";
+}
+
+function hideRegister() {
+    registerBox.style.display = "none";
+    loginBox.style.display = "block";
+}
+
+/* Popup */
+function showPop(text) {
+    let pop = document.getElementById("popup");
+    pop.innerHTML = text;
+    pop.classList.add("show");
+
+    playSuccess();
+
+    setTimeout(() => {
+        pop.classList.remove("show");
+    }, 2000);
+}
+
+/* أصوات */
+function playClick() { soundClick.play(); }
+function playSuccess() { soundSuccess.play(); }
+
+</script>
+
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>نظام معمل الروبوت</title>
+
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:'IBM Plex Sans Arabic', sans-serif;
+}
+
+body{
+    background:#0f0f14;
+    color:#fff;
+    overflow:hidden;
+}
+
+/* =============== خلفية خفيفة =============== */
+.bg-light{
+    position:absolute;
+    width:120%;
+    height:120%;
+    background:radial-gradient(circle at 30% 20%, #6128b4, #0f0f14 60%);
+    filter:blur(110px);
+    z-index:-1;
+    animation:move 15s infinite alternate ease-in-out;
+}
+@keyframes move{
+    0%{transform:translate(-20px, -20px);}
+    100%{transform:translate(20px, 20px);}
+}
+
+/* =============== القائمة الجانبية (Mini Sidebar) =============== */
+
+#sidebar{
+    position:fixed;
+    top:0;
+    right:0;
+    width:70px; /* نحيفة */
+    height:100vh;
+    background:#0c0c11;
+    border-left:1px solid #1c1c27;
+    padding:15px 10px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    transition:.3s;
+    overflow:hidden;
+}
+
+#sidebar.expanded{
+    width:230px;
+}
+
+.toggle-btn{
+    width:100%;
+    padding:12px;
+    text-align:center;
+    border-radius:10px;
+    background:#171721;
+    cursor:pointer;
+    color:#c9a4ff;
+    margin-bottom:15px;
+    border:1px solid #2d2d3a;
+    font-size:20px;
+}
+
+.menu-item{
+    width:100%;
+    padding:12px;
+    margin-bottom:8px;
+    border-radius:12px;
+    background:#171721;
+    color:#c9a4ff;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    gap:12px;
+    transition:.25s;
+    border:1px solid #262630;
+}
+
+.menu-item:hover{
+    background:#221b33;
+}
+
+/* نص العنصر */
+.menu-text{
+    opacity:0;
+    white-space:nowrap;
+    transition:.25s;
+}
+
+#sidebar.expanded .menu-text{
+    opacity:1;
+}
+
+/* =============== المحتوى الرئيسي =============== */
+
+#content{
+    position:absolute;
+    top:0;
+    right:80px;
+    width:calc(100% - 90px);
+    height:100vh;
+    padding:25px;
+    overflow-y:auto;
+    transition:.3s;
+}
+
+#sidebar.expanded ~ #content{
+    right:240px;
+    width:calc(100% - 260px);
+}
+
+/* ============ الصفحات ============ */
+
+.page{
+    display:none;
+}
+
+.page.active{
+    display:block;
+}
+
+/* ============ العناوين ============ */
+
+.title{
+    font-size:28px;
+    color:#d1b7ff;
+    margin-bottom:20px;
+}
+
+/* ============ كروت ============ */
+
+.card{
+    background:#161621;
+    padding:20px;
+    border-radius:15px;
+    margin-bottom:20px;
+    border:1px solid #262636;
+}
+
+/* ====== زر الخروج ====== */
+.logout{
+    margin-top:auto;
+    background:#b31212 !important;
+    border-color:#901010 !important;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="bg-light"></div>
+
+<!-- =================== Sidebar =================== -->
+<div id="sidebar">
+
+    <div class="toggle-btn" onclick="toggleSidebar()">☰</div>
+
+    <div class="menu-item" onclick="showPage('dashboard')">
+        <span>🏠</span> <span class="menu-text">الرئيسية</span>
+    </div>
+
+    <div class="menu-item" onclick="showPage('chatPage')">
+        <span>💬</span> <span class="menu-text">الدردشة</span>
+    </div>
+
+    <div class="menu-item" onclick="showPage('aiPage')">
+        <span>🤖</span> <span class="menu-text">المساعد الذكي</span>
+    </div>
+
+    <div class="menu-item" onclick="showPage('training')">
+        <span>📅</span> <span class="menu-text">التدريب</span>
+    </div>
+
+    <div class="menu-item" onclick="showPage('competitions')">
+        <span>🏆</span> <span class="menu-text">المسابقات</span>
+    </div>
+
+    <div class="menu-item" onclick="showPage('tools')">
+        <span>🧰</span> <span class="menu-text">الأدوات</span>
+    </div>
+
+    <div class="menu-item" onclick="showPage('projects')">
+        <span>🚀</span> <span class="menu-text">المشاريع</span>
+    </div>
+
+    <div class="menu-item" onclick="showPage('manageUsers')">
+        <span>👑</span> <span class="menu-text">إدارة المستخدمين</span>
+    </div>
+
+    <div class="menu-item logout" onclick="logout()">
+        <span>🚪</span> <span class="menu-text">خروج</span>
+    </div>
+
+</div>
+
+<!-- =================== المحتوى =================== -->
+<div id="content">
+
+    <!-- الصفحة الرئيسية -->
+    <div id="dashboard" class="page active">
+        <h1 class="title">مرحباً بك 👋</h1>
+        <div class="card">
+            <p id="welcomeTxt"></p>
+        </div>
+    </div>
+
+    <!-- صفحة الدردشة -->
+    <div id="chatPage" class="page">
+        <h1 class="title">💬 الدردشة</h1>
+        <div class="chat-container">
+
+    <div id="chatBox" class="chat-box">
+        <!-- الرسائل تظهر هنا -->
+    </div>
+
+    <div class="chat-input-area">
+        <input id="chatInput" type="text" placeholder="اكتب رسالتك..." class="chat-input">
+        <button class="chat-send-btn" onclick="sendMessage()">إرسال</button>
+    </div>
+
+</div>
+
+    </div>
+
+    <!-- صفحة الذكاء الاصطناعي -->
+    <div id="aiPage" class="page">
+        <h1 class="title">🤖 المساعد الذكي</h1>
+        <div class="card">سيتم إضافة الذكاء الاصطناعي لاحقاً</div>
+    </div>
+
+    <!-- التدريب -->
+    <div id="training" class="page">
+        <h1 class="title">📅 جدول التدريب</h1>
+        <div class="card">سيتم إضافة الجدول هنا</div>
+    </div>
+
+    <!-- مسابقات -->
+    <div id="competitions" class="page">
+        <h1 class="title">🏆 المسابقات</h1>
+        <div class="card">سيتم إضافة المسابقات</div>
+    </div>
+
+    <!-- أدوات -->
+    <div id="tools" class="page">
+        <h1 class="title">🧰 الأدوات</h1>
+        <div class="card">إدارة الأدوات لاحقاً</div>
+    </div>
+
+    <!-- مشاريع -->
+    <div id="projects" class="page">
+        <h1 class="title">🚀 المشاريع</h1>
+        <div class="card">إدارة المشاريع</div>
+    </div>
+
+    <!-- إدارة المستخدمين -->
+    <div id="manageUsers" class="page">
+        <h1 class="title">👑 إدارة المستخدمين</h1>
+        <div class="card">قائمة المستخدمين ستظهر هنا</div>
+    </div>
+
+</div>
+
+<script>
+
+/* ========== تحميل المستخدم ========== */
+
+let user = JSON.parse(localStorage.getItem("currentUser"));
+
+if(!user){
+    window.location.href = "index.html"; // رجوع للتسجيل
+}
+
+document.getElementById("welcomeTxt").innerHTML = 
+    "مرحباً " + user.id + " — رتبتك: " + user.role;
+
+/* ========== فتح وإغلاق القائمة ========== */
+
+function toggleSidebar(){
+    document.getElementById("sidebar").classList.toggle("expanded");
+}
+
+/* ========== التنقل بين الصفحات ========== */
+
+function showPage(page){
+    document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+    document.getElementById(page).classList.add("active");
+}
+
+/* ========== تسجيل الخروج ========== */
+
+function logout(){
+    localStorage.removeItem("currentUser");
+    window.location.href = "index.html";
+}
+
+</script>/* ===================== الدردشة الاحترافية ===================== */
+
+let chatMessages = JSON.parse(localStorage.getItem("chatMessages")) || [];
+
+/* تحميل الرسائل عند فتح الصفحة */
+function loadMessages() {
+    let box = document.getElementById("chatBox");
+    box.innerHTML = "";
+
+    chatMessages.forEach(msg => {
+        const side = (msg.sender === user.id) ? "msg-right" : "msg-left";
+        const bubbleSide = (msg.sender === user.id) ? "bubble-right" : "bubble-left";
+        const roleBadge = getBadge(msg.role);
+
+        box.innerHTML += `
+        <div class="msg-row ${side}">
+            <div>
+                <div class="msg-info">
+                    ${roleBadge}
+                    <span>${msg.sender}</span>
+                </div>
+
+                <div class="msg-bubble ${bubbleSide}">
+                    ${msg.text}
+
+                    <div class="msg-time">${msg.time}</div>
+                </div>
+            </div>
+        </div>
+        `;
+    });
+
+    box.scrollTop = box.scrollHeight;
+}
+
+/* إرسال رسالة */
+function sendMessage() {
+    let input = document.getElementById("chatInput");
+    let text = input.value.trim();
+    if (text === "") return;
+
+    let now = new Date();
+    let time = now.getHours() + ":" + (now.getMinutes()<10?"0":"") + now.getMinutes();
+
+    chatMessages.push({
+        sender: user.id,
+        role: user.role,
+        text: text,
+        time: time
+    });
+
+    localStorage.setItem("chatMessages", JSON.stringify(chatMessages));
+
+    input.value = "";
+    loadMessages();
+}
+
+/* زر Enter للإرسال */
+document.addEventListener("keydown", e => {
+    if (e.key === "Enter") sendMessage();
+});
+
+/* ====== البادجات حسب الرتبة ====== */
+function getBadge(role){
+    if(role === "leader") return `<span class="badge owner-badge">Owner</span>`;
+    if(role === "coach") return `<span class="badge coach-badge">Coach</span>`;
+    if(role === "team") return `<span class="badge team-badge">Team</span>`;
+    return `<span class="badge member-badge">Member</span>`;
+}
+
+/* تحميل الرسائل عند بداية الصفحة */
+loadMessages();
+
+</body>
+</html>
